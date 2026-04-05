@@ -1,0 +1,28 @@
+# Environments
+.env
+.env.example
+.venv
+venv/
+ENV/
+
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Celery / Redis / Database logs
+celerybeat-schedule
+celerybeat.pid
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+*.json
+
