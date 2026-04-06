@@ -3,7 +3,7 @@ iConnect — APScheduler Tasks
 Background workers running directly inside FastAPI:
   - poll_all_inboxes: runs every 60s
   - process_followups: runs every 5min
-  - process_outbound_campaigns: runs every 30min
+  - process_outbound_campaigns: runs every 15min
 """
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
