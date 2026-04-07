@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from fastapi import Request
+from typing import Optional
 
 # Load your .env keys
 load_dotenv()
@@ -29,15 +30,14 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
-# Define what a Campaign looks like
 class CampaignCreate(BaseModel):
     name: str
-    niche: str
-    pain_point_focus: str
-    value_proposition: str
-    social_proof: str
-    cta: str
-    daily_send_limit: int
+    niche: Optional[str] = None
+    pain_point_focus: Optional[str] = None
+    value_proposition: Optional[str] = None
+    social_proof: Optional[str] = None
+    cta: Optional[str] = "open to a 15-minute chat?"
+    daily_send_limit: Optional[int] = 30
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -103,22 +103,53 @@ async def trigger_inbox_scan(client_id: UUID, db: AsyncSession = Depends(get_db)
 
 @app.post("/api/outbound/campaigns")
 async def create_campaign(campaign: CampaignCreate, request: Request):
-    # 1. Grab the security token from the React frontend
     auth_header = request.headers.get('Authorization')
     if not auth_header:
         return {"error": "Not authenticated"}
-    
+
     token = auth_header.replace('Bearer ', '')
+
+    try:
+        user_response = supabase.auth.get_user(token)
+        user_id = user_response.user.id
+    except Exception as e:
+        return {"error": f"Auth failed: {str(e)}"}
+
+    db_data = {
+        "name": campaign.name,
+        "niche": campaign.niche,
+        "pain_point_focus": campaign.pain_point_focus,
+        "value_proposition": campaign.value_proposition,
+        "social_proof": campaign.social_proof,
+        "cta": campaign.cta,
+        "daily_send_limit": campaign.daily_send_limit,
+        "user_id": user_id,
+        "status": "draft",
+        "total_prospects": 0,
+        "emails_sent": 0,
+        "replies_received": 0,
+        "reply_rate": 0,
+    }
+
+    try:
+        result = supabase.table("campaigns").insert(db_data).execute()
+        return result.data[0]
+    except Exception as e:
+        return {"error": f"Database insert failed: {str(e)}"}
     
-    # 2. Ask Supabase who this user is
-    user_response = supabase.auth.get_user(token)
-    user_id = user_response.user.id
     
-    # 3. Prepare the data to save
-    db_data = campaign.dict()
-    db_data['user_id'] = user_id
-    
-    # 4. Insert it into the database!
-    result = supabase.table("campaigns").insert(db_data).execute()
-    
-    return result.data[0]
+@app.get("/api/outbound/campaigns")
+async def list_campaigns(request: Request):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return []
+
+    token = auth_header.replace('Bearer ', '')
+
+    try:
+        user_response = supabase.auth.get_user(token)
+        user_id = user_response.user.id
+        result = supabase.table("campaigns").select("*").eq("user_id", user_id).execute()
+        return result.data
+    except Exception as e:
+        return []
