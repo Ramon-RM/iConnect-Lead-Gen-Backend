@@ -1,7 +1,7 @@
 """
 iConnect — Main FastAPI App
 """
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,3 +153,12 @@ async def list_campaigns(request: Request):
         return result.data
     except Exception as e:
         return []
+    
+@app.post("/api/outbound/campaigns/{campaign_id}/prospects/upload")
+async def upload_csv(campaign_id: str, file: UploadFile = File(...)):
+    # Right now, this just catches the file and tells the frontend it was successful.
+    # Later, we will add the pandas logic to read the actual rows!
+    return {
+        "imported": 15, 
+        "skipped_duplicates": 2
+    }
