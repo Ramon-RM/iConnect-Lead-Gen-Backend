@@ -15,6 +15,29 @@ from app.services.email import gmail_service
 from app.services.email.processor import process_inbound_email
 from app.models.models import ClientAccount
 from app.db.database import get_db
+import os
+from pydantic import BaseModel
+from supabase import create_client, Client
+from dotenv import load_dotenv
+from fastapi import Request
+
+# Load your .env keys
+load_dotenv()
+
+# Connect to Supabase
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
+# Define what a Campaign looks like
+class CampaignCreate(BaseModel):
+    name: str
+    niche: str
+    pain_point_focus: str
+    value_proposition: str
+    social_proof: str
+    cta: str
+    daily_send_limit: int
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -77,3 +100,25 @@ async def trigger_inbox_scan(client_id: UUID, db: AsyncSession = Depends(get_db)
         count += 1
 
     return {"status": f"Success! AI processed and replied to {count} emails."}
+
+@app.post("/api/outbound/campaigns")
+async def create_campaign(campaign: CampaignCreate, request: Request):
+    # 1. Grab the security token from the React frontend
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return {"error": "Not authenticated"}
+    
+    token = auth_header.replace('Bearer ', '')
+    
+    # 2. Ask Supabase who this user is
+    user_response = supabase.auth.get_user(token)
+    user_id = user_response.user.id
+    
+    # 3. Prepare the data to save
+    db_data = campaign.dict()
+    db_data['user_id'] = user_id
+    
+    # 4. Insert it into the database!
+    result = supabase.table("campaigns").insert(db_data).execute()
+    
+    return result.data[0]
